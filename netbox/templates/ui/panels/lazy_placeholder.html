@@ -1,0 +1,13 @@
+{% load i18n %}
+<div
+  class="card"
+  hx-get="{{ lazy_panel_url }}"
+  hx-trigger="load"
+  hx-target="this"
+  hx-swap="outerHTML"
+>
+  <div class="card-body text-muted text-center py-5" aria-busy="true">
+    <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+    {% trans "Loading..." %}
+  </div>
+</div>

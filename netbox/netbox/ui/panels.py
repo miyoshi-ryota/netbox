@@ -15,6 +15,7 @@ __all__ = (
     'CommentsPanel',
     'ContextTablePanel',
     'JSONPanel',
+    'LazyLoadTemplatePanel',
     'NestedGroupObjectPanel',
     'ObjectAttributesPanel',
     'ObjectPanel',
@@ -351,6 +352,30 @@ class TemplatePanel(Panel):
     def render(self, context):
         # Pass the entire context to the template
         return render_to_string(self.template_name, context.flatten())
+
+
+class LazyLoadTemplatePanel(TemplatePanel):
+    """
+    A TemplatePanel that initially renders a placeholder and loads its content via HTMX.
+
+    Parameters:
+        template_name (str): The name of the template to render
+        panel_id (str): The identifier used to request the panel fragment
+    """
+    query_param = 'lazy_panel'
+
+    def __init__(self, template_name, panel_id):
+        super().__init__(template_name=template_name)
+        self.panel_id = panel_id
+
+    def render(self, context):
+        request = context['request']
+        querydict = request.GET.copy()
+        querydict[self.query_param] = self.panel_id
+
+        return render_to_string('ui/panels/lazy_placeholder.html', {
+            'lazy_panel_url': f'{request.path}?{querydict.urlencode()}',
+        })
 
 
 class TextCodePanel(ObjectPanel):

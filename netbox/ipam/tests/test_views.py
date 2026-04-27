@@ -11,9 +11,12 @@ from dcim.models import Device, DeviceRole, DeviceType, Interface, Manufacturer,
 from ipam.choices import *
 from ipam.models import *
 from netbox.choices import CSVDelimiterChoices, ImportFormatChoices
+from netbox.ui.panels import LazyLoadTemplatePanel
 from tenancy.models import Tenant
 from users.models import ObjectPermission
 from utilities.testing import ViewTestCases, create_tags
+
+PREFIX_ADDRESSING_PANEL_ID = 'prefix-addressing'
 
 
 class ASNRangeTestCase(ViewTestCases.PrimaryObjectViewTestCase):
@@ -466,6 +469,46 @@ class PrefixTestCase(ViewTestCases.PrimaryObjectViewTestCase):
             'is_pool': False,
             'description': 'New description',
         }
+
+    @override_settings(EXEMPT_VIEW_PERMISSIONS=['*'])
+    def test_prefix_view_uses_lazy_placeholder_for_addressing_panel(self):
+        prefix = self._get_queryset().first()
+
+        response = self.client.get(prefix.get_absolute_url())
+        self.assertHttpStatus(response, 200)
+        self.assertContains(
+            response,
+            f'hx-get="{prefix.get_absolute_url()}?{LazyLoadTemplatePanel.query_param}={PREFIX_ADDRESSING_PANEL_ID}"'
+        )
+        self.assertNotContains(response, 'Available IPs')
+
+    @override_settings(EXEMPT_VIEW_PERMISSIONS=['*'])
+    def test_prefix_view_returns_lazy_addressing_panel_partial(self):
+        prefix = self._get_queryset().first()
+
+        response = self.client.get(
+            prefix.get_absolute_url(),
+            {LazyLoadTemplatePanel.query_param: PREFIX_ADDRESSING_PANEL_ID},
+            HTTP_HX_REQUEST='true',
+        )
+        self.assertHttpStatus(response, 200)
+        self.assertContains(response, 'Utilization')
+        self.assertContains(response, 'Available IPs')
+        self.assertNotContains(
+            response,
+            f'hx-get="{prefix.get_absolute_url()}?{LazyLoadTemplatePanel.query_param}={PREFIX_ADDRESSING_PANEL_ID}"'
+        )
+
+    @override_settings(EXEMPT_VIEW_PERMISSIONS=['*'])
+    def test_prefix_view_rejects_unknown_lazy_panel(self):
+        prefix = self._get_queryset().first()
+
+        response = self.client.get(
+            prefix.get_absolute_url(),
+            {LazyLoadTemplatePanel.query_param: 'unknown-panel'},
+            HTTP_HX_REQUEST='true',
+        )
+        self.assertHttpStatus(response, 404)
 
     @override_settings(EXEMPT_VIEW_PERMISSIONS=['*'])
     def test_prefix_prefixes(self):

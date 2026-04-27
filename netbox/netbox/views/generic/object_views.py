@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.db import router, transaction
 from django.db.models import ProtectedError, RestrictedError
 from django.db.models.deletion import Collector
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.html import escape
@@ -14,6 +14,7 @@ from django.utils.translation import gettext as _
 
 from core.signals import clear_events
 from netbox.object_actions import BulkDelete, BulkEdit, CloneObject, DeleteObject, EditObject
+from netbox.ui.panels import LazyLoadTemplatePanel
 from utilities.error_handlers import handle_protectederror
 from utilities.exceptions import AbortRequest, PermissionsViolation
 from utilities.forms import DeleteForm, restrict_form_fields
@@ -65,6 +66,19 @@ class ObjectView(ActionsMixin, BaseObjectView):
         model_opts = self.queryset.model._meta
         return f'{model_opts.app_label}/{model_opts.model_name}.html'
 
+    def get_lazy_load_panel(self, request):
+        panel_id = request.GET.get(LazyLoadTemplatePanel.query_param)
+        if not panel_id or self.layout is None:
+            return None
+
+        for row in self.layout.rows:
+            for column in row.columns:
+                for panel in column.panels:
+                    if isinstance(panel, LazyLoadTemplatePanel) and panel.panel_id == panel_id:
+                        return panel
+
+        raise Http404(_("Panel not found."))
+
     #
     # Request handlers
     #
@@ -77,15 +91,20 @@ class ObjectView(ActionsMixin, BaseObjectView):
             request: The current request
         """
         instance = self.get_object(**kwargs)
+        lazy_panel = self.get_lazy_load_panel(request) if htmx_partial(request) else None
         actions = self.get_permitted_actions(request.user, model=instance)
-
-        return render(request, self.get_template_name(), {
+        context = {
             'object': instance,
             'actions': actions,
             'tab': self.tab,
             'layout': self.layout,
             **self.get_extra_context(request, instance),
-        })
+        }
+
+        if lazy_panel is not None:
+            return render(request, lazy_panel.template_name, context)
+
+        return render(request, self.get_template_name(), context)
 
 
 class ObjectChildrenView(ObjectView, ActionsMixin, TableMixin):

@@ -15,10 +15,10 @@ from netbox.ui import actions, layout
 from netbox.ui.panels import (
     CommentsPanel,
     ContextTablePanel,
+    LazyLoadTemplatePanel,
     ObjectsTablePanel,
     PluginContentPanel,
     RelatedObjectsPanel,
-    TemplatePanel,
 )
 from netbox.views import generic
 from utilities.query import count_related
@@ -716,7 +716,7 @@ class PrefixView(generic.ObjectView):
             panels.PrefixPanel(),
         ],
         right_panels=[
-            TemplatePanel('ipam/panels/prefix_addressing.html'),
+            LazyLoadTemplatePanel('ipam/panels/prefix_addressing.html', panel_id='prefix-addressing'),
             CustomFieldsPanel(),
             TagsPanel(),
             CommentsPanel(),
